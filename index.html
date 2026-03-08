@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WordSaver · Bootstrap 5 + localStorage</title>
+  <!-- Bootstrap 5 CSS + Icons (responsive ready) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    /* smooth shadows & card transitions */
+    .word-card { transition: transform 0.15s ease, box-shadow 0.2s; }
+    .word-card:hover { transform: translateY(-3px); box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.1) !important; }
+    .speak-btn { cursor: pointer; }
+    .empty-illustration { opacity: 0.7; max-width: 280px; }
+    /* custom responsive tweaks */
+    @media (max-width: 576px) {
+      .display-6 { font-size: 1.75rem; }
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+  <!-- top navbar (responsive) -->
+  <nav class="navbar navbar-expand-sm bg-white shadow-sm py-3">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="#">
+        <i class="bi bi-book-half text-primary me-2"></i>WordSaver
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarAsideToggle">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarAsideToggle">
+        <!-- right side button (visible on mobile) to toggle offcanvas -->
+        <div class="ms-auto d-sm-none">
+          <button class="btn btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#addWordOffcanvas">
+            <i class="bi bi-plus-lg"></i> Add word
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- main container: aside toolbar (col-md-3) + main word wall -->
+  <div class="container my-4">
+    <div class="row g-4">
+      <!-- aside / toolbar (hidden on small screens, but also appears as offcanvas on mobile) -->
+      <aside class="col-md-3">
+        <div class="bg-white p-4 rounded-4 shadow d-none d-md-block">
+          <h5 class="mb-3"><i class="bi bi-tools me-2 text-primary"></i>Toolbar</h5>
+          <p class="small text-secondary">Manage your vocabulary</p>
+          <button class="btn btn-primary w-100 mb-3" data-bs-toggle="offcanvas" data-bs-target="#addWordOffcanvas">
+            <i class="bi bi-plus-circle me-2"></i>Add new word
+          </button>
+          <button class="btn btn-outline-secondary w-100 mb-2" id="clearStorageBtn">
+            <i class="bi bi-eraser me-2"></i>Remove all
+          </button>
+          <hr>
+          <div class="small text-muted">
+            <i class="bi bi-info-circle-fill me-1"></i>Your words stay in browser storage.
+          </div>
+        </div>
+        <!-- mobile hint: toolbar collapses into offcanvas, but we also keep a minimal card -->
+        <div class="d-md-none bg-white p-3 rounded-4 shadow-sm mb-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>Tools</span>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="offcanvas" data-bs-target="#addWordOffcanvas">
+              <i class="bi bi-plus"></i> New word
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- main content: word cards grid -->
+      <main class="col-md-9">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h2 class="h4 mb-0 fw-semibold"><i class="bi bi-card-list me-2 text-primary"></i>My words</h2>
+          <span class="badge bg-primary px-3 py-2 rounded-pill" id="wordCount">0</span>
+        </div>
+
+        <!-- words container (dynamic cards) -->
+        <div id="wordsContainer" class="row g-3">
+          <!-- if empty, js will inject an empty state -->
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ========== OFFCANVAS (add word form) ========== -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="addWordOffcanvas" aria-labelledby="offcanvasLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="offcanvasLabel"><i class="bi bi-pencil-square me-2"></i>Add new word</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form id="wordForm">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Word / phrase <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="wordInput" placeholder="e.g. Serendipity" required>
+        </div>
+        
+        <!-- Image section: two options (URL or file upload) -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Word image</label>
+          <div class="border rounded p-3 bg-light">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="imageSource" id="urlRadio" value="url" checked>
+              <label class="form-check-label" for="urlRadio">
+                Image URL
+              </label>
+            </div>
+            <div class="mb-3 ps-3" id="urlInputGroup">
+              <input type="url" class="form-control" id="imageUrlInput" placeholder="https://...jpg">
+              <div class="form-text">Enter a public image link.</div>
+            </div>
+
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="imageSource" id="uploadRadio" value="upload">
+              <label class="form-check-label" for="uploadRadio">
+                Upload from device
+              </label>
+            </div>
+            <div class="mb-2 ps-3 d-none" id="uploadInputGroup">
+              <input type="file" class="form-control" id="imageUploadInput" accept="image/*">
+              <div class="form-text">Select a picture (will be stored as data URL).</div>
+            </div>
+            <!-- hidden preview / hint: both methods will produce an image src -->
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Example sentence</label>
+          <textarea class="form-control" id="exampleInput" rows="2" placeholder="e.g. She found serendipity in the old library."></textarea>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Speech part (optional)</label>
+          <select class="form-select" id="speechSelect">
+            <option value="" selected>— select —</option>
+            <option value="noun">noun</option>
+            <option value="verb">verb</option>
+            <option value="adjective">adjective</option>
+            <option value="adverb">adverb</option>
+            <option value="other">other</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-save me-2"></i>Save word</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- hidden template for empty state (shown when no words) -->
+  <template id="emptyStateTemplate">
+    <div class="col-12 text-center py-5 empty-state">
+      <img src="https://cdn-icons-png.flaticon.com/512/4076/4076478.png" alt="empty" class="empty-illustration img-fluid mb-3" style="max-width:200px;">
+      <h5 class="text-secondary">Your vocabulary list is empty</h5>
+      <p class="text-muted">Click “Add new word” in the toolbar to start.</p>
+      <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#addWordOffcanvas"><i class="bi bi-plus-circle me-2"></i>Add first word</button>
+    </div>
+  </template>
+
+  <!-- Bootstrap JS (required for offcanvas, collapse) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- main app logic (style unchanged) -->
+  <script>
+    (function() {
+      // ----- localStorage key -----
+      const STORAGE_KEY = 'wordSaverVocab';
+
+      // ----- words array -----
+      let words = [];
+
+      // ----- load from localStorage -----
+      function loadWords() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            words = JSON.parse(stored);
+          } catch (e) {
+            words = [];
+          }
+        } else {
+          words = [];
+        }
+      }
+
+      // ----- save to localStorage -----
+      function saveWords() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+      }
+
+      // ----- render all cards into container (identical style, but now handles dataURLs) -----
+      function renderWords() {
+        const container = document.getElementById('wordsContainer');
+        const wordCountSpan = document.getElementById('wordCount');
+        if (!container) return;
+
+        wordCountSpan.textContent = words.length;
+
+        if (words.length === 0) {
+          const template = document.getElementById('emptyStateTemplate');
+          const clone = template.content.cloneNode(true);
+          container.innerHTML = '';
+          container.appendChild(clone);
+          return;
+        }
+
+        let html = '';
+        words.forEach((wordObj, index) => {
+          // determine image source (could be URL or dataURL from upload)
+          let imgSrc = wordObj.image && wordObj.image.trim() !== '' 
+            ? wordObj.image 
+            : 'https://placehold.co/600x400/6f42c1/white?text=Word';
+
+          // speech part badge
+          const speechBadge = wordObj.speech && wordObj.speech !== '' 
+            ? `<span class="badge bg-info text-dark me-2">${wordObj.speech}</span>` 
+            : '';
+
+          html += `
+            <div class="col-sm-6 col-lg-4">
+              <div class="card h-100 word-card border-0 shadow-sm">
+                <img src="${escapeHtml(imgSrc)}" class="card-img-top" style="height: 160px; object-fit: cover;" alt="${escapeHtml(wordObj.word)}">
+                <div class="card-body pb-2">
+                  <div class="d-flex align-items-start justify-content-between">
+                    <h5 class="card-title fw-bold mb-1">${escapeHtml(wordObj.word)}</h5>
+                    ${speechBadge}
+                  </div>
+                  <p class="card-text small text-secondary-emphasis mt-2">${escapeHtml(wordObj.example) || '<span class="fst-italic text-muted">No example</span>'}</p>
+                </div>
+                <div class="card-footer bg-transparent border-0 pt-0 d-flex justify-content-between align-items-center">
+                  <span class="speak-btn text-primary" data-word="${escapeHtml(wordObj.word)}" title="pronounce (simulated)">
+                    <i class="bi bi-volume-up-fill fs-5"></i> <span class="small">speak</span>
+                  </span>
+                  <button class="btn btn-sm btn-outline-danger delete-word-btn" data-index="${index}" title="remove word">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        container.innerHTML = html;
+
+        // attach speech events
+        document.querySelectorAll('.speak-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const word = btn.getAttribute('data-word');
+            if (window.speechSynthesis && word) {
+              const utterance = new SpeechSynthesisUtterance(word);
+              utterance.lang = 'en-US';
+              utterance.rate = 0.9;
+              speechSynthesis.speak(utterance);
+            } else {
+              alert(`speak: "${word}" (simulation – browser speech not supported)`);
+            }
+          });
+        });
+
+        // attach delete events
+        document.querySelectorAll('.delete-word-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const index = btn.getAttribute('data-index');
+            if (index !== null) {
+              words.splice(parseInt(index), 1);
+              saveWords();
+              renderWords();
+            }
+          });
+        });
+      }
+
+      function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      // ----- handle form with dual image options -----
+      function initForm() {
+        const form = document.getElementById('wordForm');
+        const offcanvasEl = document.getElementById('addWordOffcanvas');
+        const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl) || new bootstrap.Offcanvas(offcanvasEl);
+
+        // radio toggle logic
+        const urlRadio = document.getElementById('urlRadio');
+        const uploadRadio = document.getElementById('uploadRadio');
+        const urlGroup = document.getElementById('urlInputGroup');
+        const uploadGroup = document.getElementById('uploadInputGroup');
+
+        urlRadio.addEventListener('change', function() {
+          if (this.checked) {
+            urlGroup.classList.remove('d-none');
+            uploadGroup.classList.add('d-none');
+            // disable file input to avoid accidental inclusion
+            document.getElementById('imageUploadInput').value = '';
+          }
+        });
+
+        uploadRadio.addEventListener('change', function() {
+          if (this.checked) {
+            uploadGroup.classList.remove('d-none');
+            urlGroup.classList.add('d-none');
+            document.getElementById('imageUrlInput').value = '';
+          }
+        });
+
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+
+          const wordInput = document.getElementById('wordInput');
+          const exampleInput = document.getElementById('exampleInput');
+          const speechSelect = document.getElementById('speechSelect');
+          
+          // Get word (required)
+          const wordText = wordInput.value.trim();
+          if (!wordText) {
+            alert('Please enter a word.');
+            return;
+          }
+
+          // Image handling: promise to get image data (url or file as dataURL)
+          const processImage = () => {
+            return new Promise((resolve) => {
+              // Case 1: URL radio selected
+              if (urlRadio.checked) {
+                const urlValue = document.getElementById('imageUrlInput').value.trim();
+                resolve(urlValue); // may be empty string -> later becomes placeholder
+              } 
+              // Case 2: Upload radio selected
+              else if (uploadRadio.checked) {
+                const fileInput = document.getElementById('imageUploadInput');
+                const file = fileInput.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = function(ev) {
+                    resolve(ev.target.result); // data URL
+                  };
+                  reader.onerror = () => resolve(''); // fallback empty
+                  reader.readAsDataURL(file);
+                } else {
+                  resolve(''); // no file selected -> empty
+                }
+              } else {
+                resolve(''); // fallback (shouldn't happen)
+              }
+            });
+          };
+
+          processImage().then((imageSrc) => {
+            const newWord = {
+              word: wordText,
+              image: imageSrc,   // may be empty string (url or dataURL)
+              example: exampleInput.value.trim(),
+              speech: speechSelect.value
+            };
+
+            words.push(newWord);
+            saveWords();
+            renderWords();
+
+            // reset form fields completely
+            wordInput.value = '';
+            document.getElementById('imageUrlInput').value = '';
+            document.getElementById('imageUploadInput').value = '';
+            exampleInput.value = '';
+            speechSelect.value = '';
+
+            // set default radio to URL and show URL group (clean state)
+            urlRadio.checked = true;
+            urlGroup.classList.remove('d-none');
+            uploadGroup.classList.add('d-none');
+
+            offcanvas.hide();
+          }).catch(err => {
+            console.warn('image error', err);
+            // proceed without image
+            const newWord = {
+              word: wordText,
+              image: '',
+              example: exampleInput.value.trim(),
+              speech: speechSelect.value
+            };
+            words.push(newWord);
+            saveWords();
+            renderWords();
+            offcanvas.hide();
+          });
+        });
+      }
+
+      // ----- clear all words button -----
+      function initClearButton() {
+        const clearBtn = document.getElementById('clearStorageBtn');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            if (confirm('Delete all words? This cannot be undone.')) {
+              words = [];
+              saveWords();
+              renderWords();
+            }
+          });
+        }
+      }
+
+      // ----- boot -----
+      loadWords();
+      renderWords();
+      initForm();
+      initClearButton();
+
+      // sync across tabs
+      window.addEventListener('storage', (e) => {
+        if (e.key === STORAGE_KEY) {
+          loadWords();
+          renderWords();
+        }
+      });
+    })();
+  </script>
+  <!-- extra style (unchanged) -->
+  <style>
+    .empty-illustration { filter: drop-shadow(0 10px 8px #0000000d); }
+    .word-card .card-footer { background-color: transparent; }
+  </style>
+</body>
+</html>
